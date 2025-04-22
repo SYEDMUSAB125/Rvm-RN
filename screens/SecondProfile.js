@@ -200,6 +200,7 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 20,
+    marginTop: 30,
     backgroundColor: '#f5f5f5',
   },
   title: {
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   picker: {
-    height: 50,
+    height: 52,
     width: '100%',
   },
   item:{

@@ -244,7 +244,7 @@ const ProfileRegistration = ({ route, navigation }) => {
           >
             <Picker.Item label="Male" value="male" style={styles.item} />
             <Picker.Item label="Female" value="female" style={styles.item} />
-            <Picker.Item label="Other" value="other" style={styles.item} />
+            <Picker.Item label="Prefer not to say" value="other" style={styles.item} />
           </Picker>
         </View>
       </View>

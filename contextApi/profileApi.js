@@ -2,82 +2,10 @@ import axios from 'axios';
 
 // Create a configured axios instance
 const api = axios.create({
-  baseURL: 'http://192.168.221.252:3000', // Use baseURL instead of repeating it
+  baseURL: 'https://rvm-backend.vercel.app', // Use baseURL instead of repeating it
   timeout: 10000, // Set a reasonable timeout (10 seconds)
 });
 
-// export const registerUser = async (userData) => {
-//   try {
-//     console.log('Registering user with data:', userData);
-    
-//     // Create a regular object instead of FormData since we're not uploading files
-//     const requestData = {
-//       phoneNumber: userData.phoneNumber,
-//       username: userData.username,
-//       age: userData.age,
-//       gender: userData.gender,
-//       profilePicPath: userData.profilePic // Just send the path reference
-//     };
-
-//     const response = await api.post('/register', requestData, {
-//       headers: {
-//         'Content-Type': 'application/json',
-//         'Accept': 'application/json',
-//       },
-//       timeout: 10000,
-//     });
-
-
-//     return {
-//       success: true,
-//       data: response.data,
-//       status: response.status
-//     };
-
-//   } catch (error) {
-//     console.error('Registration error:', error);
-    
-//     // Enhanced error handling
-//     if (axios.isCancel(error)) {
-//       throw {
-//         message: 'Request was cancelled',
-//         isNetworkError: false,
-//         isCancelled: true
-//       };
-//     } else if (error.code === 'ECONNABORTED') {
-//       throw {
-//         message: 'Request timeout. Please check your connection.',
-//         isNetworkError: true,
-//         isTimeout: true
-//       };
-//     } else if (!error.response) {
-//       // No response received (network error)
-//       throw {
-//         message: 'Network error. Please check your internet connection.',
-//         isNetworkError: true
-//       };
-//     } else {
-//       // Server responded with error status
-//       const status = error.response?.status;
-//       let message = 'Registration failed';
-      
-//       if (status === 409) {
-//         message = error.response.data?.message || 'User already exists';
-//       } else if (status === 400) {
-//         message = error.response.data?.message || 'Invalid request data';
-//       } else if (status >= 500) {
-//         message = 'Server error. Please try again later.';
-//       }
-      
-//       throw {
-//         message,
-//         status,
-//         serverError: true,
-//         responseData: error.response.data
-//       };
-//     }
-//   }
-// };
 
 
 export const registerUser = async (userData) => {

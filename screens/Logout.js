@@ -11,6 +11,7 @@ const Logout = () => {
       index: 0,
       routes: [{ name: 'MobileNumber' }],
     });
+    navigation.closeDrawer();
   }, [navigation]);
 
   return (

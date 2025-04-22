@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
   RefreshControl, 
   ScrollView,
-  Dimensions
+  Dimensions,
+  Alert
 } from 'react-native';
 import RecyclingIcon from 'react-native-vector-icons/MaterialIcons';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -34,6 +35,27 @@ const Dashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [totalPoints, setTotalPoints] = useState(0);
+const [totalBottles, setTotalBottles] = useState(0);
+const [totalCups, setTotalCups] = useState(0);
+const isInitialRender = useRef(true);
+
+
+  const calculateTotalsFromHistory = (history) => {
+    let points = 0;
+    let bottles = 0;
+    let cups = 0;
+  
+    history.forEach(item => {
+      const session = item.recyclingSessions;
+      points += session?.points || 0;
+      bottles += session?.bottles || 0;
+      cups += session?.cups || 0;
+    });
+  
+    return { points, bottles, cups };
+  };
+
   const fetchAllData = async () => {
     try {
       setLoading(true);
@@ -41,23 +63,57 @@ const Dashboard = () => {
       
       // 1. Load user details
       const jsonValue = await AsyncStorage.getItem('userDetails');
-      if (!jsonValue) throw new Error('No user data found');
-      
-      const parsedUserDetails = JSON.parse(jsonValue);
-      setUserDetails(parsedUserDetails);
-
+      let parsedUserDetails = null;
+      let phoneNumberToUse = null;
+  
+      if (jsonValue) {
+        parsedUserDetails = JSON.parse(jsonValue);
+        setUserDetails(parsedUserDetails);
+        phoneNumberToUse = parsedUserDetails.phoneNumber;
+      } else {
+        // Use recycleDetails if AsyncStorage is empty
+        setUserDetails(recycleDetails);
+        phoneNumberToUse = recycleDetails?.phoneNumber;
+      }
+  
       // 2. Fetch recycling data
-      const recycleResponse = await getRecycledetails(parsedUserDetails.phoneNumber);
-      console.log("the recycle response is ",recycleResponse);
+      const recycleResponse = await getRecycledetails(phoneNumberToUse);
+     
+      
       if (recycleResponse.status !== 200) {
         throw new Error(recycleResponse.message || 'Failed to fetch recycling data');
       }
+      
       setRecycleDetail(recycleResponse.data);
-
-      // 3. Fetch history data
-      const historyResponse = await fetchHistoryData(parsedUserDetails.phoneNumber);
-      console.log("the history reposne is ",historyResponse);
-      setHistoryData(historyResponse);
+  
+      // Update phone number from recycleResponse if we didn't have one before
+      if (!phoneNumberToUse && recycleResponse.data?.phoneNumber) {
+        phoneNumberToUse = recycleResponse.data.phoneNumber;
+      }
+  
+      // Final fallback to recycleDetails if still no phone number
+      if (!phoneNumberToUse && recycleDetails?.phoneNumber) {
+        phoneNumberToUse = recycleDetails.phoneNumber;
+      }
+  
+      if (phoneNumberToUse) {
+        const historyResponse = await fetchHistoryData(phoneNumberToUse);
+  
+        setHistoryData(historyResponse);
+        
+        // Calculate totals from history
+        const { points, bottles, cups } = calculateTotalsFromHistory(historyResponse);
+        setTotalPoints(points);
+        setTotalBottles(bottles);
+        setTotalCups(cups);
+      } else {
+        console.warn("No phone number available to fetch history");
+        setHistoryData([]);
+        // Reset totals if no history
+        setTotalPoints(0);
+        setTotalBottles(0);
+        setTotalCups(0);
+      }
       
     } catch (err) {
       console.error('Dashboard data error:', err);
@@ -67,13 +123,14 @@ const Dashboard = () => {
       setRefreshing(false);
     }
   };
-
   const fetchHistoryData = async (phoneNumber) => {
+  
     try {
-      const response = await fetch(`http://192.168.221.252:3000/newgethistory/${phoneNumber}`);
+ 
+      const response = await fetch(`https://rvm-backend.vercel.app/newgethistory/${phoneNumber}`);
       if (!response.ok) throw new Error('History fetch failed');
       const data = await response.json();
-      console.log("the history data is ",data);
+  
       return data || []; // Assuming your API returns { history: [...] }
     } catch (err) {
       console.error('History fetch error:', err);
@@ -84,6 +141,7 @@ const Dashboard = () => {
   const onRefresh = () => {
     setRefreshing(true);
     fetchAllData();
+    showRewardNotification();
   };
 
   useEffect(() => {
@@ -91,24 +149,41 @@ const Dashboard = () => {
   }, []);
 
   // Calculate points from either context or local state
-  const circularPoints = recycleDetails?.points || recycleDetail?.points || 0;
+  const circularPoints = totalPoints || 0;
 
-  // Reward notification logic
   useEffect(() => {
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
+  
     if (circularPoints >= rewardPoints) {
       showRewardNotification();
       setHasNewNotification(true);
+      setRewardPoints(rewardPoints + 100);
     }
   }, [circularPoints, rewardPoints]);
+
+
+
+
 
   const showRewardNotification = () => {
     Dialog.show({
       type: ALERT_TYPE.SUCCESS,
       title: 'Reward Unlocked!',
-      textBody: `Congratulations! You've earned ${rewardPoints} points.`,
+      textBody: `Congratulations! You've earned ${totalPoints} points.`,
       button: 'Got it',
+      
     });
   };
+
+
+
+
+
+
+
 
   const toggleNotificationModal = () => {
     setShowNotificationModal(!showNotificationModal);
@@ -116,6 +191,7 @@ const Dashboard = () => {
   };
 
   if (loading && !refreshing) {
+    showRewardNotification()
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4F46E5" />
@@ -124,23 +200,29 @@ const Dashboard = () => {
     );
   }
 
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Icon name="warning" size={40} color="#EF4444" />
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity 
-          style={styles.retryButton}
-          onPress={fetchAllData}
-        >
-          <Text style={styles.retryText}>Try Again</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+
 
   return (
-    <AlertNotificationRoot>
+    <AlertNotificationRoot
+
+    dialogConfig={{
+    shouldHandleByRoot: true,
+    defaultDialogStyle: {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: [{ translateX: -150 }, { translateY: -100 }], // Adjust based on dialog size
+      width: '80%',
+      borderRadius: 16,
+      zIndex: 999,
+      backgroundColor: 'white',
+      padding: 20,
+    },
+    overlayStyle: {
+      backgroundColor: '#1E1B4B',
+    }
+  }}
+>
     <ScrollView 
       style={styles.scrollContainer}
       contentContainerStyle={styles.contentContainer}
@@ -178,43 +260,61 @@ const Dashboard = () => {
 
       {/* Points Card */}
       <View style={styles.pointsCard}>
-        <View style={styles.pointsInfo}>
-          <Text style={styles.pointsLabel}>Total Points</Text>
-          <Text style={styles.pointsValue}>{circularPoints}</Text>
-          <TouchableOpacity 
-            style={styles.redeemButton}
-            onPress={() => navigation.navigate('Rewards')}
-          >
-            <Text style={styles.redeemText}>Redeem Points</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.circularPoints}>
-          <Text style={styles.circularNumber}>{`${circularPoints}/${rewardPoints}`}</Text>
-        </View>
+  <View style={styles.pointsInfo}>
+    <Text style={styles.pointsLabel}>Total Points</Text>
+    <Text style={styles.pointsValue}>{totalPoints}</Text>
+    <View style={styles.totalsContainer}>
+      <View style={styles.totalItem}>
+        <Icon name="water" size={16} color="#E0E7FF" />
+        <Text style={styles.totalText}>{totalBottles}</Text>
       </View>
+      <View style={styles.totalItem}>
+        <Icon name="cafe" size={16} color="#E0E7FF" />
+        <Text style={styles.totalText}>{totalCups}</Text>
+      </View>
+    </View>
+    <TouchableOpacity 
+      style={styles.redeemButton}
+      onPress={()=>{
+        Alert.alert(
+          "This feature is not available yet",
+          "Are you sure you want to redeem your points?",
+          [
+            {
+              text: "Cancel",
+              style: "cancel"
+            },
+            { text: "OK" }
+          ]
+        );
+      }}
+    >
+      <Text style={styles.redeemText}>Redeem Points</Text>
+    </TouchableOpacity>
+  </View>
+  <View style={styles.circularPoints}>
+    <Text style={styles.circularNumber}>{`${circularPoints}/${rewardPoints}`}</Text>
+  </View>
+</View>
 
       {/* Stats Cards */}
       <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <View style={styles.statIconContainer}>
-            <Icon name="water" size={24} color="#4F46E5" />
-          </View>
-          <Text style={styles.statCount}>
-            {recycleDetails?.recyclingSessions?.bottles || recycleDetail?.bottles || 0}
-          </Text>
-          <Text style={styles.statLabel}>Bottles</Text>
-        </View>
-        
-        <View style={styles.statCard}>
-          <View style={styles.statIconContainer}>
-            <Icon name="cafe" size={24} color="#4F46E5" />
-          </View>
-          <Text style={styles.statCount}>
-            {recycleDetails?.cups || recycleDetail?.cups || 0}
-          </Text>
-          <Text style={styles.statLabel}>Cups/Cuttlery</Text>
-        </View>
-      </View>
+  <View style={styles.statCard}>
+    <View style={styles.statIconContainer}>
+      <Icon name="water" size={24} color="#4F46E5" />
+    </View>
+    <Text style={styles.statCount}>{totalBottles}</Text>
+    <Text style={styles.statLabel}>Total Bottles</Text>
+  </View>
+  
+  <View style={styles.statCard}>
+    <View style={styles.statIconContainer}>
+      <Icon name="cafe" size={24} color="#4F46E5" />
+    </View>
+    <Text style={styles.statCount}>{totalCups}</Text>
+    <Text style={styles.statLabel}>Total Cups</Text>
+  </View>
+</View>
 
       {/* History Section */}
       <View style={styles.sectionContainer}>
@@ -297,7 +397,7 @@ const Dashboard = () => {
             {hasNewNotification ? (
               <View style={styles.notificationItem}>
                 <View style={styles.notificationIcon}>
-                  <Icon name="trophy" size={24} color="#FFD700" />
+                  <Icon name="trophy-outline" size={24} color="#FFD700" />
                 </View>
                 <View style={styles.notificationText}>
                   <Text style={styles.notificationTitle}>Reward Unlocked!</Text>
@@ -442,9 +542,9 @@ const styles = StyleSheet.create({
   },
   circularPoints: {
     backgroundColor: '#2E2C5F',
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 16,
@@ -472,6 +572,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+  },
+  totalsContainer: {
+    flexDirection: 'row',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  totalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  totalText: {
+    color: '#E0E7FF',
+    marginLeft: 4,
+    fontSize: 14,
   },
   statIconContainer: {
     width: 40,

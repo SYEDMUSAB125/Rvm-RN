@@ -3,7 +3,7 @@ import axios from 'axios';
 
 // Configure axios instance
 const api = axios.create({
-  baseURL: 'http://192.168.221.252:3000', // Your backend base URL
+  baseURL: 'https://rvm-backend.vercel.app', // Your backend base URL
   timeout: 10000, // 10 second timeout
 });
 
