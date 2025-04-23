@@ -222,6 +222,9 @@ const isInitialRender = useRef(true);
       backgroundColor: '#1E1B4B',
     }
   }}
+
+
+  
 >
     <ScrollView 
       style={styles.scrollContainer}
