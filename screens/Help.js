@@ -5,14 +5,60 @@ import {
   ScrollView, 
   StyleSheet, 
   TouchableOpacity, 
-  StatusBar 
+  StatusBar, 
+  Alert
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
-
+import { Linking, Platform } from 'react-native';
 const HelpScreen = () => {
   const navigation = useNavigation();
-
+  const openEmailSupport = async () => {
+    const email = 'isprvm@gmail.com';
+    const subject = 'Support Request';
+    const body = 'Hello Support Team,\n\n I need some help regarding your RVM machine.';
+    
+    // Try Gmail app first on Android
+    if (Platform.OS === 'android') {
+      try {
+        const gmailUrl = `https://mail.google.com/mail/u/0/?view=cm&fs=1&to=${email}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        const supported = await Linking.canOpenURL(gmailUrl);
+        
+        if (supported) {
+          await Linking.openURL(gmailUrl);
+          return;
+        }
+      } catch (e) {
+        console.log('Gmail app not available');
+      }
+    }
+  
+    // Fallback to standard mailto
+    try {
+      const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      await Linking.openURL(mailtoUrl);
+    } catch (error) {
+      // Final fallback - open webmail
+      Alert.alert(
+        'Open Webmail',
+        'No email app found. Would you like to open Gmail in your browser?',
+        [
+          {
+            text: 'Open Browser',
+            onPress: () => Linking.openURL(`https://mail.google.com/mail/?view=cm&to=${email}`)
+          },
+          {
+            text: 'Copy Email',
+            onPress: () => {
+              Clipboard.setString(email);
+              Alert.alert('Email Copied!', `${email} is ready to paste`);
+            }
+          },
+          { text: 'Cancel' }
+        ]
+      );
+    }
+  };
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#4F46E5" barStyle="light-content" />
@@ -75,17 +121,9 @@ const HelpScreen = () => {
             <Icon name="headset" size={24} color="#4F46E5" />
             <Text style={styles.heading}> Contact Support</Text>
           </View>
-          <TouchableOpacity style={styles.button}>
-            <Icon name="chatbubble-ellipses" size={20} color="#fff" />
-            <Text style={styles.buttonText}> Live Chat</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.button}>
-            <Icon name="call" size={20} color="#fff" />
-            <Text style={styles.buttonText}> Call Helpline (24/7)</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.button}>
+          <TouchableOpacity style={styles.button}
+          onPress={openEmailSupport}
+          >
             <Icon name="mail" size={20} color="#fff" />
             <Text style={styles.buttonText}> Email Support</Text>
           </TouchableOpacity>

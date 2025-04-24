@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -11,22 +11,23 @@ import {
   RefreshControl, 
   ScrollView,
   Dimensions,
+  BackHandler ,
   Alert
 } from 'react-native';
 import RecyclingIcon from 'react-native-vector-icons/MaterialIcons';
 import Icon from 'react-native-vector-icons/Ionicons';
-
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contextApi/auth';
-import { ALERT_TYPE, Dialog, AlertNotificationRoot } from 'react-native-alert-notification';
+import AwesomeAlert from 'react-native-awesome-alerts';
 import { getRecycledetails } from '../contextApi/profileApi';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-const { width } = Dimensions.get('window');
+import { useFocusEffect } from '@react-navigation/native'; // Added import
+const { width ,height } = Dimensions.get('window');
 const Dashboard = () => {
   const navigation = useNavigation();
   const { recycleDetails } = useAuth();
   const [showNotificationModal, setShowNotificationModal] = useState(false);
-  const [rewardPoints, setRewardPoints] = useState(100); // Example reward threshold
+  const [rewardPoints, setRewardPoints] = useState(300); // Example reward threshold
   const [hasNewNotification, setHasNewNotification] = useState(false);
   const [recycleDetail, setRecycleDetail] = useState(null);
   const [userDetails, setUserDetails] = useState(null);
@@ -38,6 +39,7 @@ const Dashboard = () => {
   const [totalPoints, setTotalPoints] = useState(0);
 const [totalBottles, setTotalBottles] = useState(0);
 const [totalCups, setTotalCups] = useState(0);
+const [showAlert, setShowAlert] = useState(false);
 const isInitialRender = useRef(true);
 
 
@@ -55,6 +57,30 @@ const isInitialRender = useRef(true);
   
     return { points, bottles, cups };
   };
+
+
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     const backHandler = BackHandler.addEventListener(
+  //       'hardwareBackPress',
+  //       () => {
+  //         if (showAlert) {
+  //           setShowAlert(false);
+  //           return true;
+  //         }
+  //         if (showNotificationModal) {
+  //           setShowNotificationModal(false);
+  //           return true;
+  //         }
+  //         return false;
+  //       }
+  //     );
+  
+  //     return () => backHandler.remove(); // Correct cleanup
+  //   }, [showAlert, showNotificationModal])
+  // );
+
+
 
   const fetchAllData = async () => {
     try {
@@ -123,6 +149,11 @@ const isInitialRender = useRef(true);
       setRefreshing(false);
     }
   };
+
+
+  
+    
+   
   const fetchHistoryData = async (phoneNumber) => {
   
     try {
@@ -141,7 +172,7 @@ const isInitialRender = useRef(true);
   const onRefresh = () => {
     setRefreshing(true);
     fetchAllData();
-    showRewardNotification();
+
   };
 
   useEffect(() => {
@@ -158,31 +189,11 @@ const isInitialRender = useRef(true);
     }
   
     if (circularPoints >= rewardPoints) {
-      showRewardNotification();
+      setShowAlert(true);
       setHasNewNotification(true);
       setRewardPoints(rewardPoints + 100);
     }
   }, [circularPoints, rewardPoints]);
-
-
-
-
-
-  const showRewardNotification = () => {
-    Dialog.show({
-      type: ALERT_TYPE.SUCCESS,
-      title: 'Reward Unlocked!',
-      textBody: `Congratulations! You've earned ${totalPoints} points.`,
-      button: 'Got it',
-      
-    });
-  };
-
-
-
-
-
-
 
 
   const toggleNotificationModal = () => {
@@ -191,7 +202,7 @@ const isInitialRender = useRef(true);
   };
 
   if (loading && !refreshing) {
-    showRewardNotification()
+
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4F46E5" />
@@ -203,29 +214,31 @@ const isInitialRender = useRef(true);
 
 
   return (
-    <AlertNotificationRoot
-
-    dialogConfig={{
-    shouldHandleByRoot: true,
-    defaultDialogStyle: {
-      position: 'absolute',
-      top: '50%',
-      left: '50%',
-      transform: [{ translateX: -150 }, { translateY: -100 }], // Adjust based on dialog size
-      width: '80%',
-      borderRadius: 16,
-      zIndex: 999,
-      backgroundColor: 'white',
-      padding: 20,
-    },
-    overlayStyle: {
-      backgroundColor: '#1E1B4B',
-    }
-  }}
-
-
-  
->
+    <>
+     <AwesomeAlert
+        show={showAlert}
+        showProgress={false}
+        title="Reward Unlocked!"
+        message={`Congratulations🎉! You've earned ${totalPoints} points. Keep going!`}
+        closeOnTouchOutside={true}
+closeOnHardwareBackPress={false}
+        showCancelButton={false}
+        showConfirmButton={true}
+        confirmText="Got it"
+        confirmButtonColor="#4F46E5"
+        onConfirmPressed={() => {
+          setShowAlert(false);
+          this.hideAlert();
+        }}
+        onCancelPressed={() => {
+          this.hideAlert();
+        }}
+        titleStyle={styles.alertTitle}
+        messageStyle={styles.alertMessage}
+        contentContainerStyle={styles.alertContainer}
+        confirmButtonStyle={styles.largeConfirmButton} // Add this prop
+        confirmButtonTextStyle={styles.largeConfirmButtonText} // Add this prop
+      />
     <ScrollView 
       style={styles.scrollContainer}
       contentContainerStyle={styles.contentContainer}
@@ -233,7 +246,7 @@ const isInitialRender = useRef(true);
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          colors={['#4F46E5']}
+          colors={['rgba(30, 27, 75, 0.7)']}
         />
       }
     >
@@ -417,7 +430,7 @@ const isInitialRender = useRef(true);
         </View>
       </Modal>
     </ScrollView>
-  </AlertNotificationRoot>
+    </>
   );
 };
 
@@ -754,6 +767,62 @@ const styles = StyleSheet.create({
   notificationMessage: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  alertContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 10,
+    width: '85%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  alertTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1E1B4B',
+    marginBottom: 12,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  alertMessage: {
+    fontSize: 16,
+    color: '#4B5563',
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
+  alertButton: {
+    backgroundColor: '#4F46E5',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  alertButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  largeConfirmButton: {
+    width: '80%', // Makes button wider
+    height: 50, // Makes button taller
+    borderRadius: 12, // Rounded corners
+    justifyContent: 'center',
+    alignSelf: 'center', // Center the button
+    
+  },
+  largeConfirmButtonText: {
+    textAlign:"center",
+    fontSize: 18, // Larger text
+    fontWeight: '600', // Bold text
   },
   emptyNotification: {
     padding: 24,
